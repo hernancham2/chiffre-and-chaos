@@ -23,7 +23,13 @@ bun run dev               # API :3001 + web :3000 (proxy /api)
 
 Abre <http://localhost:3000>. **La primera cuenta registrada es administradora** (o define `ADMIN_EMAILS=a@b.com,c@d.com`).
 
-Producción: `bun run build && bun run start` (Hono sirve `dist/` y la API en `PORT`). Necesita un host con WebSockets persistentes (VPS, Fly, Railway, Render…); **no** sirve en Vercel serverless.
+## Despliegue gratuito en Render
+
+1. Sube el repo a GitHub.
+2. En render.com: **New → Blueprint** y elige el repo (usa `render.yaml` + `Dockerfile`).
+3. Rellena sólo `DATABASE_URL` (Neon, con `?sslmode=require`) y `ADMIN_EMAILS` (tu correo).
+
+`BETTER_AUTH_SECRET` se genera solo y la URL pública se toma de `RENDER_EXTERNAL_URL`. `KEEP_ALIVE=true` evita que el plan gratuito se duerma por inactividad (las salas viven en memoria). Para otros hosts: `bun run build && bun run start` (Hono sirve `dist/` y la API en `PORT`); necesita WebSockets persistentes, no sirve en Vercel serverless.
 
 ## Cómo se juega
 

@@ -8,11 +8,9 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: BETTER_AUTH_SECRET
-        generateValue: true
-      - key: BETTER_AUTH_URL
-        sync: false
-      - key: TRUSTED_ORIGINS
-        sync: false
       - key: ADMIN_EMAILS
         sync: false
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: KEEP_ALIVE
+        value: "true"

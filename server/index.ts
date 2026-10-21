@@ -245,6 +245,13 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', serveStatic({ path: './dist/index.html' }))
 }
 
+// Render (plan gratuito) duerme el servicio tras 15 min sin tráfico y las salas viven en memoria:
+// con KEEP_ALIVE=true el servicio se consulta a sí mismo para seguir despierto.
+if (process.env.KEEP_ALIVE === 'true' && process.env.RENDER_EXTERNAL_URL) {
+  setInterval(() => fetch(`${process.env.RENDER_EXTERNAL_URL}/api/health`).catch(() => {}), 10 * 60_000).unref?.()
+}
+process.on('SIGTERM', () => process.exit(0))
+
 const port = Number(process.env.PORT ?? 3001)
 console.log(`✦ Chiffre & Chaos escuchando en :${port}`)
 

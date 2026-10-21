@@ -10,12 +10,15 @@ const adminEmails = (process.env.ADMIN_EMAILS ?? '')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean)
 
-const origins = (process.env.TRUSTED_ORIGINS ?? 'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000')
-  .split(',')
-  .map((s) => s.trim())
+// En Render, RENDER_EXTERNAL_URL trae la URL pública; así no hace falta configurarla a mano.
+const publicUrl = process.env.BETTER_AUTH_URL ?? process.env.RENDER_EXTERNAL_URL ?? 'http://localhost:3000'
+const origins = [
+  ...(process.env.TRUSTED_ORIGINS ?? 'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000').split(','),
+  publicUrl,
+].map((s) => s.trim()).filter(Boolean)
 
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
+  baseURL: publicUrl,
   secret: process.env.BETTER_AUTH_SECRET ?? 'dev-only-secret-change-me-dev-only-secret-change-me',
   trustedOrigins: origins,
   database: drizzleAdapter(db, { provider: 'pg', schema }),
