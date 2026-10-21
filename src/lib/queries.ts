@@ -5,7 +5,7 @@ export interface Me {
   id: string
   name: string
   email: string
-  role: 'admin' | 'player'
+  role: 'admin' | 'user'
 }
 
 export const meQuery = queryOptions({

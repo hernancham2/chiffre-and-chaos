@@ -1,29 +1,33 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
+import { bigint, boolean, integer, jsonb, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
-// ───────── better-auth ─────────
-export const user = sqliteTable('user', {
+// ───────── better-auth (con el plugin admin: role, banned, impersonatedBy) ─────────
+export const user = pgTable('user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
-  emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
+  emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
-  role: text('role').notNull().default('player'),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  role: text('role').notNull().default('user'),
+  banned: boolean('banned').notNull().default(false),
+  banReason: text('ban_reason'),
+  banExpires: timestamp('ban_expires'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
 
-export const session = sqliteTable('session', {
+export const session = pgTable('session', {
   id: text('id').primaryKey(),
-  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
   token: text('token').notNull().unique(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  impersonatedBy: text('impersonated_by'),
 })
 
-export const account = sqliteTable('account', {
+export const account = pgTable('account', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull(),
   providerId: text('provider_id').notNull(),
@@ -31,54 +35,54 @@ export const account = sqliteTable('account', {
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   idToken: text('id_token'),
-  accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp_ms' }),
-  refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp_ms' }),
+  accessTokenExpiresAt: timestamp('access_token_expires_at'),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
   scope: text('scope'),
   password: text('password'),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
 
-export const verification = sqliteTable('verification', {
+export const verification = pgTable('verification', {
   id: text('id').primaryKey(),
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
-  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 })
 
 // ───────── juego ─────────
-export const questions = sqliteTable('questions', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const questions = pgTable('questions', {
+  id: serial('id').primaryKey(),
   text: text('text').notNull(),
-  options: text('options', { mode: 'json' }).$type<string[]>().notNull(),
+  options: jsonb('options').$type<string[]>().notNull(),
   correctIndex: integer('correct_index').notNull(),
   source: text('source').$type<'semanario' | 'libre'>().notNull(),
   week: integer('week'),
   topic: text('topic').notNull().default(''),
   explanation: text('explanation').notNull().default(''),
-  active: integer('active', { mode: 'boolean' }).notNull().default(true),
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 })
 
-export const settings = sqliteTable('settings', {
+export const settings = pgTable('settings', {
   key: text('key').primaryKey(),
-  value: text('value', { mode: 'json' }).notNull(),
+  value: jsonb('value').notNull(),
 })
 
-export const gameResults = sqliteTable('game_results', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const gameResults = pgTable('game_results', {
+  id: serial('id').primaryKey(),
   code: text('code').notNull(),
   hostUserId: text('host_user_id').notNull(),
-  finishedAt: integer('finished_at').notNull(),
+  finishedAt: bigint('finished_at', { mode: 'number' }).notNull(),
   totalQuestions: integer('total_questions').notNull(),
-  result: text('result', { mode: 'json' }).notNull(),
+  result: jsonb('result').notNull(),
 })
 
-export const gameParticipants = sqliteTable('game_participants', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const gameParticipants = pgTable('game_participants', {
+  id: serial('id').primaryKey(),
   gameId: integer('game_id').notNull().references(() => gameResults.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull(),
 })

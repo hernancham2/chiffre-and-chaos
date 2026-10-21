@@ -8,7 +8,9 @@ import { SourceBadge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Modal } from '#/components/ui/dialog'
 import { Input, Label, Select, Textarea } from '#/components/ui/input'
+import { authClient } from '#/lib/auth-client'
 import { requireAuth } from '#/lib/guard'
+import { meQuery } from '#/lib/queries'
 import { api, cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/admin')({
@@ -223,22 +225,39 @@ function Settings() {
 // ───────────── Usuarios ─────────────
 function Users() {
   const qc = useQueryClient()
-  const list = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<any[]>('/admin/users') })
-  const setRole = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: string }) => api(`/admin/users/${id}/role`, { method: 'PUT', json: { role } }),
+  const me = useQuery(meQuery).data
+  const list = useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: async () => {
+      const r = await authClient.admin.listUsers({ query: { limit: 200, sortBy: 'createdAt', sortDirection: 'desc' } })
+      if (r.error) throw new Error(r.error.message)
+      return r.data.users as any[]
+    },
+  })
+  const act = useMutation({
+    mutationFn: async (fn: () => Promise<{ error: { message?: string } | null }>) => {
+      const r = await fn()
+      if (r.error) throw new Error(r.error.message ?? 'No se pudo completar')
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
     onError: (e) => toast.error(e.message),
   })
   return (
-    <div className="panel overflow-hidden">
+    <div className="panel overflow-x-auto">
       <table className="w-full text-left">
         <thead className="bg-ink-700/60 font-display text-xs uppercase tracking-widest text-parch-dim"><tr><th className="p-3">Nombre</th><th className="p-3">Correo</th><th className="p-3">Rol</th><th className="p-3" /></tr></thead>
         <tbody>
           {list.data?.map((u) => (
-            <tr key={u.id} className="border-t border-gold/10">
+            <tr key={u.id} className={cn('border-t border-gold/10', u.banned && 'opacity-60')}>
               <td className="p-3">{u.name}</td><td className="p-3 text-parch-dim">{u.email}</td>
-              <td className="p-3"><span className={cn('rounded-full px-2 py-0.5 text-xs uppercase tracking-widest', u.role === 'admin' ? 'bg-gold/20 text-gold' : 'bg-ink-600')}>{u.role}</span></td>
-              <td className="p-3 text-right"><Button size="sm" variant="ghost" onClick={() => setRole.mutate({ id: u.id, role: u.role === 'admin' ? 'player' : 'admin' })}>{u.role === 'admin' ? 'Quitar admin' : 'Hacer admin'}</Button></td>
+              <td className="p-3">
+                <span className={cn('rounded-full px-2 py-0.5 text-xs uppercase tracking-widest', u.role === 'admin' ? 'bg-gold/20 text-gold' : 'bg-ink-600')}>{u.role}</span>
+                {u.banned && <span className="ml-2 rounded-full bg-infernal/20 px-2 py-0.5 text-xs uppercase tracking-widest text-infernal">vetado</span>}
+              </td>
+              <td className="space-x-1 p-3 text-right">
+                <Button size="sm" variant="ghost" disabled={u.id === me?.id} onClick={() => act.mutate(() => authClient.admin.setRole({ userId: u.id, role: u.role === 'admin' ? 'user' : 'admin' }))}>{u.role === 'admin' ? 'Quitar admin' : 'Hacer admin'}</Button>
+                <Button size="sm" variant={u.banned ? 'subtle' : 'danger'} disabled={u.id === me?.id} onClick={() => act.mutate(() => (u.banned ? authClient.admin.unbanUser({ userId: u.id }) : authClient.admin.banUser({ userId: u.id, banReason: 'Vetado por el administrador' })))}>{u.banned ? 'Levantar veto' : 'Vetar'}</Button>
+              </td>
             </tr>
           ))}
         </tbody>

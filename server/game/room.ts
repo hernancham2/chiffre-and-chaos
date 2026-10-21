@@ -32,8 +32,8 @@ import {
 import { Clock, pick, randInt, rollDie, shuffle, uid } from './util'
 
 export interface RoomDeps {
-  loadQuestions(sources: string[]): RuntimeQuestion[]
-  saveResult(code: string, hostUserId: string, result: GameResult, userIds: string[]): number | null
+  loadQuestions(sources: string[]): RuntimeQuestion[] | Promise<RuntimeQuestion[]>
+  saveResult(code: string, hostUserId: string, result: GameResult, userIds: string[]): number | null | Promise<number | null>
 }
 
 interface ActiveQ {
@@ -217,7 +217,7 @@ export class Room {
   }
 
   // ───────────────────────── mensajes de cliente ─────────────────────────
-  handle(userId: string, isAdmin: boolean, msg: ClientMsg): void {
+  handle(userId: string, isAdmin: boolean, msg: ClientMsg): void | Promise<void> {
     this.lastActivity = Date.now()
     const team = this.teamOf(userId)
     const isHost = userId === this.hostUserId || isAdmin
@@ -316,7 +316,7 @@ export class Room {
       case 'kick': {
         if (!msg.teamId) return
         const t = this.team(msg.teamId)
-        if (this.phase === 'lobby') return this.handle(this.hostUserId, true, { t: 'remove_team', teamId: t.id })
+        if (this.phase === 'lobby') return void this.handle(this.hostUserId, true, { t: 'remove_team', teamId: t.id })
         if (t.userId) this.onKick?.(t.userId, 'El docente te retiró de la sala')
         t.bot = true
         t.userId = null
@@ -357,12 +357,20 @@ export class Room {
   }
 
   // ───────────────────────── inicio ─────────────────────────
-  startGame() {
+  private starting = false
+  async startGame() {
+    if (this.starting) return
     if (this.phase !== 'lobby') throw new GameError('La partida ya comenzó')
     if (this.teams.length < this.settings.minTeams) throw new GameError(`Se necesitan al menos ${this.settings.minTeams} líderes en la sala`)
     const offline = this.teams.filter((t) => !t.bot && !t.connected)
     if (offline.length) throw new GameError(`Hay líderes desconectados: ${offline.map((t) => t.name).join(', ')}`)
-    this.pool = this.deps.loadQuestions(this.settings.sources)
+    this.starting = true
+    try {
+      this.pool = await this.deps.loadQuestions(this.settings.sources)
+    } finally {
+      this.starting = false
+    }
+    if (this.phase !== 'lobby') return
     if (!this.pool.length) throw new GameError('No hay preguntas activas con esas fuentes')
     const deck: CardInst[] = shuffle(CARDS.map((c) => ({ id: uid('c'), key: c.key })))
     const per = Math.min(this.settings.cardsPerTeam, Math.floor(deck.length / this.teams.length))
@@ -602,11 +610,13 @@ export class Room {
       })
       .sort((a, b) => b.finalScore - a.finalScore || b.correct - a.correct)
     this.result = { id: null, code: this.code, finishedAt: Date.now(), totalQuestions: this.settings.totalQuestions, teams }
-    try {
-      this.result.id = this.deps.saveResult(this.code, this.hostUserId, this.result, this.teams.map((t) => t.userId).filter(Boolean) as string[])
-    } catch (e) {
-      console.error('No se pudo guardar el resultado', e)
-    }
+    const result = this.result
+    Promise.resolve(this.deps.saveResult(this.code, this.hostUserId, result, this.teams.map((t) => t.userId).filter(Boolean) as string[]))
+      .then((id) => {
+        result.id = id
+        this.emit()
+      })
+      .catch((e) => console.error('No se pudo guardar el resultado', e))
     this.phase = 'finished'
     this.log('system', 'El Códice se cierra. Los destinos están sellados.')
     this.emit()

@@ -1,16 +1,18 @@
-import { Database } from 'bun:sqlite'
-import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
-import { mkdirSync } from 'node:fs'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import { migrate } from 'drizzle-orm/postgres-js/migrator'
+import postgres from 'postgres'
 import * as schema from './schema'
 
-mkdirSync('data', { recursive: true })
-export const sqlite = new Database(process.env.DB_PATH ?? 'data/chiffre.db', { create: true })
-sqlite.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
+const url = process.env.DATABASE_URL
+if (!url) throw new Error('Falta DATABASE_URL (cadena de conexión de PostgreSQL)')
 
-export const db = drizzle(sqlite, { schema })
+// Los drivers de Node/Bun no implementan channel_binding; se omite y se mantiene sslmode.
+const clean = url.replace(/([?&])channel_binding=[^&]*&?/, '$1').replace(/[?&]$/, '')
+
+export const sql = postgres(clean, { max: 10, idle_timeout: 20, connect_timeout: 15, ssl: 'require' })
+export const db = drizzle(sql, { schema })
 export { schema }
 
-export function runMigrations() {
-  migrate(db, { migrationsFolder: 'drizzle' })
+export async function runMigrations() {
+  await migrate(db, { migrationsFolder: 'drizzle' })
 }

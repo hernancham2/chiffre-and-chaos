@@ -1,6 +1,8 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { admin } from 'better-auth/plugins'
 import { count } from 'drizzle-orm'
+import { ac, roles } from '../shared/access'
 import { db, schema } from './db'
 
 const adminEmails = (process.env.ADMIN_EMAILS ?? '')
@@ -16,20 +18,17 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
   secret: process.env.BETTER_AUTH_SECRET ?? 'dev-only-secret-change-me-dev-only-secret-change-me',
   trustedOrigins: origins,
-  database: drizzleAdapter(db, { provider: 'sqlite', schema }),
+  database: drizzleAdapter(db, { provider: 'pg', schema }),
   emailAndPassword: { enabled: true, minPasswordLength: 8, autoSignIn: true },
-  user: {
-    additionalFields: {
-      role: { type: 'string', defaultValue: 'player', input: false },
-    },
-  },
+  plugins: [admin({ ac, roles, defaultRole: 'user', adminRoles: ['admin'] })],
   databaseHooks: {
     user: {
       create: {
+        // la primera cuenta (o las de ADMIN_EMAILS) nace como administradora
         before: async (u) => {
           const [{ n }] = await db.select({ n: count() }).from(schema.user)
           const isAdmin = n === 0 || adminEmails.includes(u.email.toLowerCase())
-          return { data: { ...u, role: isAdmin ? 'admin' : 'player' } }
+          return { data: { ...u, role: isAdmin ? 'admin' : 'user' } }
         },
       },
     },
@@ -42,5 +41,5 @@ export async function getSessionUser(headers: Headers): Promise<SessionUser | nu
   const s = await auth.api.getSession({ headers })
   if (!s) return null
   const u = s.user as SessionUser
-  return { id: u.id, name: u.name, email: u.email, role: u.role ?? 'player' }
+  return { id: u.id, name: u.name, email: u.email, role: u.role ?? 'user' }
 }

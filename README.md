@@ -8,16 +8,16 @@ Simulador web en tiempo real del juego de examen de Criptografía (UNJBG): los *
 |---|---|
 | Frontend | React 19, TanStack Router (file-based) + TanStack Query, Tailwind v4, componentes estilo shadcn (Radix), GSAP, Vite |
 | Backend | **Hono** sobre Bun (REST + WebSocket), Zod |
-| Datos | **Drizzle ORM** + SQLite (`bun:sqlite`) |
-| Auth | **better-auth** (correo + contraseña, rol `admin`/`player`) |
+| Datos | **Drizzle ORM** + PostgreSQL (Neon, driver `postgres`) |
+| Auth | **better-auth** con el plugin **admin** (roles `admin`/`user`, permisos propios, vetos) |
 
-El estado de cada sala vive en memoria del servidor (autoritativo) y se difunde por WebSocket; los resultados, preguntas y ajustes se guardan en SQLite.
+El estado de cada sala vive en memoria del servidor (autoritativo) y se difunde por WebSocket; los resultados, preguntas y ajustes se guardan en PostgreSQL.
 
 ## Puesta en marcha
 
 ```bash
 bun install
-cp .env.example .env      # cambia BETTER_AUTH_SECRET
+cp .env.example .env      # define DATABASE_URL (PostgreSQL) y BETTER_AUTH_SECRET
 bun run dev               # API :3001 + web :3000 (proxy /api)
 ```
 

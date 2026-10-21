@@ -36,7 +36,7 @@ function invariants(room: Room): string[] {
 async function testCard(key: string) {
   const room = new Room('TEST' + key.slice(0, 4).toUpperCase(), { id: 'host', name: 'Docente' }, false, { ...DEFAULT_SETTINGS, questionTimeSec: 120, totalQuestions: 10 }, deps)
   for (let i = 0; i < 4; i++) room.addTeam(null, 'bot', true)
-  room.startGame()
+  await room.startGame()
   await waitFor(() => room.phase === 'answering', 20_000)
   const q = room.q!
   const me = room.team(q.teamId!)

@@ -11,8 +11,8 @@ import { manager, type Conn } from './game/manager'
 import { GameError } from './game/types'
 import { getSettings, resultsForUser, saveSettings, seedQuestions } from './store'
 
-runMigrations()
-const seeded = seedQuestions()
+await runMigrations()
+const seeded = await seedQuestions()
 if (seeded) console.log(`✦ ${seeded} preguntas sembradas`)
 
 type Env = { Variables: { user: SessionUser } }
@@ -29,10 +29,13 @@ const requireUser = async (c: any, next: any) => {
   c.set('user', user)
   await next()
 }
-const requireAdmin = async (c: any, next: any) => {
+
+/** Exige un permiso del control de acceso de better-auth (plugin admin). */
+const requirePerm = (permissions: Record<string, string[]>) => async (c: any, next: any) => {
   const user = await getSessionUser(c.req.raw.headers)
   if (!user) return c.json({ error: 'No autenticado' }, 401)
-  if (user.role !== 'admin') return c.json({ error: 'Se requiere rol de administrador' }, 403)
+  const res = await auth.api.userHasPermission({ body: { userId: user.id, permissions } })
+  if (!res.success) return c.json({ error: 'No tienes permiso para esta acción' }, 403)
   c.set('user', user)
   await next()
 }
@@ -45,7 +48,7 @@ app.get('/api/me', async (c) => {
   return c.json({ user })
 })
 
-app.get('/api/settings', requireUser, (c) => c.json(getSettings()))
+app.get('/api/settings', requireUser, async (c) => c.json(await getSettings()))
 
 app.get('/api/rooms', requireUser, (c) =>
   c.json(
@@ -65,10 +68,10 @@ app.post(
   '/api/rooms',
   requireUser,
   zValidator('json', z.object({ hostPlays: z.boolean().default(false), settings: settingsSchema.partial().default({}) })),
-  (c) => {
+  async (c) => {
     const user = c.get('user')
     const { hostPlays, settings } = c.req.valid('json')
-    const base = getSettings()
+    const base = await getSettings()
     const merged = settingsSchema.parse({ ...base, ...settings, tokensPerTeam: base.tokensPerTeam })
     const mine = [...manager.rooms.values()].filter((r) => r.hostUserId === user.id && r.phase !== 'finished')
     if (mine.length >= 3) return c.json({ error: 'Ya diriges demasiadas salas activas' }, 429)
@@ -77,41 +80,37 @@ app.post(
   },
 )
 
-app.get('/api/results', requireUser, (c) => {
-  const user = c.get('user')
-  return c.json(resultsForUser(user.id, false))
-})
-app.get('/api/results/:id', requireUser, (c) => {
+app.get('/api/results', requireUser, async (c) => c.json(await resultsForUser(c.get('user').id)))
+app.get('/api/results/:id', requireUser, async (c) => {
   const user = c.get('user')
   const id = Number(c.req.param('id'))
-  const row = db.select().from(schema.gameResults).where(eq(schema.gameResults.id, id)).get()
+  const [row] = await db.select().from(schema.gameResults).where(eq(schema.gameResults.id, id))
   if (!row) return c.json({ error: 'No encontrado' }, 404)
-  const mine = db
+  const [mine] = await db
     .select()
     .from(schema.gameParticipants)
     .where(and(eq(schema.gameParticipants.gameId, id), eq(schema.gameParticipants.userId, user.id)))
-    .get()
   if (!mine && user.role !== 'admin') return c.json({ error: 'No participaste en esa partida' }, 403)
   return c.json({ ...(row.result as object), id: row.id })
 })
 
-// ───────────── administración ─────────────
+// ───────────── administración (permisos de better-auth admin) ─────────────
+// La gestión de usuarios (listar, rol, ban) la ofrece el propio plugin en /api/auth/admin/*.
 const admin = new Hono<Env>()
-admin.use('*', requireAdmin)
+const canList = requirePerm({ user: ['list'] })
 
-admin.get('/questions', (c) => {
+admin.get('/questions', canList, async (c) => {
   const { source, week, q, active } = c.req.query()
   const conds = []
   if (source === 'semanario' || source === 'libre') conds.push(eq(schema.questions.source, source))
   if (week) conds.push(eq(schema.questions.week, Number(week)))
   if (active === '1' || active === '0') conds.push(eq(schema.questions.active, active === '1'))
   if (q) conds.push(or(like(schema.questions.text, `%${q}%`), like(schema.questions.topic, `%${q}%`)))
-  const rows = db
+  const rows = await db
     .select()
     .from(schema.questions)
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(schema.questions.id))
-    .all()
   return c.json(rows)
 })
 
@@ -121,83 +120,64 @@ const checkQuestion = (q: z.infer<typeof questionInputSchema>) => {
   return null
 }
 
-admin.post('/questions', zValidator('json', questionInputSchema), (c) => {
+admin.post('/questions', requirePerm({ question: ['create'] }), zValidator('json', questionInputSchema), async (c) => {
   const q = c.req.valid('json')
   const bad = checkQuestion(q)
   if (bad) return c.json({ error: bad }, 400)
   const now = Date.now()
-  const row = db
+  const [row] = await db
     .insert(schema.questions)
     .values({ ...q, week: q.source === 'semanario' ? (q.week ?? null) : null, createdAt: now, updatedAt: now })
     .returning()
-    .get()
   return c.json(row, 201)
 })
 
-admin.put('/questions/:id', zValidator('json', questionInputSchema), (c) => {
+admin.put('/questions/:id', requirePerm({ question: ['update'] }), zValidator('json', questionInputSchema), async (c) => {
   const q = c.req.valid('json')
   const bad = checkQuestion(q)
   if (bad) return c.json({ error: bad }, 400)
-  const row = db
+  const [row] = await db
     .update(schema.questions)
     .set({ ...q, week: q.source === 'semanario' ? (q.week ?? null) : null, updatedAt: Date.now() })
     .where(eq(schema.questions.id, Number(c.req.param('id'))))
     .returning()
-    .get()
   return row ? c.json(row) : c.json({ error: 'No encontrada' }, 404)
 })
 
-admin.patch('/questions/:id/active', zValidator('json', z.object({ active: z.boolean() })), (c) => {
-  const row = db
+admin.patch('/questions/:id/active', requirePerm({ question: ['update'] }), zValidator('json', z.object({ active: z.boolean() })), async (c) => {
+  const [row] = await db
     .update(schema.questions)
     .set({ active: c.req.valid('json').active, updatedAt: Date.now() })
     .where(eq(schema.questions.id, Number(c.req.param('id'))))
     .returning()
-    .get()
   return row ? c.json(row) : c.json({ error: 'No encontrada' }, 404)
 })
 
-admin.delete('/questions/:id', (c) => {
-  db.delete(schema.questions).where(eq(schema.questions.id, Number(c.req.param('id')))).run()
+admin.delete('/questions/:id', requirePerm({ question: ['delete'] }), async (c) => {
+  await db.delete(schema.questions).where(eq(schema.questions.id, Number(c.req.param('id'))))
   return c.json({ ok: true })
 })
 
-admin.post('/questions/reseed', (c) => c.json({ added: seedQuestions() }))
+admin.post('/questions/reseed', requirePerm({ question: ['create'] }), async (c) => c.json({ added: await seedQuestions() }))
 
-admin.get('/stats', (c) => {
-  const [q] = db.select({ n: sql<number>`count(*)`, a: sql<number>`sum(active)` }).from(schema.questions).all()
-  const [u] = db.select({ n: sql<number>`count(*)` }).from(schema.user).all()
-  const [g] = db.select({ n: sql<number>`count(*)` }).from(schema.gameResults).all()
+admin.get('/stats', canList, async (c) => {
+  const [q] = await db
+    .select({ n: sql<number>`count(*)::int`, a: sql<number>`count(*) filter (where ${schema.questions.active})::int` })
+    .from(schema.questions)
+  const [u] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.user)
+  const [g] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.gameResults)
   return c.json({ questions: q.n, activeQuestions: q.a ?? 0, users: u.n, games: g.n, rooms: manager.rooms.size })
 })
 
-admin.get('/settings', (c) => c.json(getSettings()))
-admin.put('/settings', zValidator('json', settingsSchema), (c) => {
+admin.get('/settings', canList, async (c) => c.json(await getSettings()))
+admin.put('/settings', requirePerm({ settings: ['update'] }), zValidator('json', settingsSchema), async (c) => {
   const s = c.req.valid('json')
   if (s.minTeams > s.maxTeams) return c.json({ error: 'El mínimo de equipos no puede superar al máximo' }, 400)
-  saveSettings(s)
+  await saveSettings(s)
   return c.json(s)
 })
 
-admin.get('/users', (c) =>
-  c.json(
-    db
-      .select({ id: schema.user.id, name: schema.user.name, email: schema.user.email, role: schema.user.role, createdAt: schema.user.createdAt })
-      .from(schema.user)
-      .orderBy(desc(schema.user.createdAt))
-      .all(),
-  ),
-)
-admin.put('/users/:id/role', zValidator('json', z.object({ role: z.enum(['admin', 'player']) })), (c) => {
-  const me = c.get('user')
-  const id = c.req.param('id')
-  const { role } = c.req.valid('json')
-  if (id === me.id && role !== 'admin') return c.json({ error: 'No puedes quitarte el rol de administrador a ti mismo' }, 400)
-  db.update(schema.user).set({ role }).where(eq(schema.user.id, id)).run()
-  return c.json({ ok: true })
-})
-
-admin.get('/rooms', (c) =>
+admin.get('/rooms', canList, (c) =>
   c.json(
     [...manager.rooms.values()].map((r) => ({
       code: r.code,
@@ -211,7 +191,7 @@ admin.get('/rooms', (c) =>
     })),
   ),
 )
-admin.delete('/rooms/:code', (c) => {
+admin.delete('/rooms/:code', requirePerm({ room: ['close'] }), (c) => {
   manager.close(c.req.param('code').toUpperCase())
   return c.json({ ok: true })
 })
@@ -235,7 +215,7 @@ app.get(
         conn = { ws: { send: (d) => ws.send(d), close: (code, reason) => ws.close(code, reason) }, user }
         manager.attach(room, conn)
       },
-      onMessage(evt, ws) {
+      async onMessage(evt, ws) {
         if (!room || !conn) return
         let msg: ClientMsg
         try {
@@ -246,7 +226,7 @@ app.get(
         }
         if (msg.t === 'ping') return ws.send(JSON.stringify({ t: 'pong' }))
         try {
-          room.handle(user.id, user.role === 'admin', msg)
+          await room.handle(user.id, user.role === 'admin', msg)
         } catch (e) {
           const known = e instanceof GameError || e instanceof z.ZodError
           if (!known) console.error(e)
