@@ -10,7 +10,7 @@ const adminEmails = (process.env.ADMIN_EMAILS ?? '')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean)
 
-const origins = (process.env.TRUSTED_ORIGINS ?? 'http://localhost:3000,http://localhost:3001')
+const origins = (process.env.TRUSTED_ORIGINS ?? 'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000')
   .split(',')
   .map((s) => s.trim())
 
