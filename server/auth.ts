@@ -10,17 +10,25 @@ const adminEmails = (process.env.ADMIN_EMAILS ?? '')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean)
 
+// Normaliza URLs (sin barra final ni espacios); las variables vacías se ignoran.
+const clean = (u?: string) => (u ?? '').trim().replace(/\/+$/, '')
+const onRender = !!process.env.RENDER_EXTERNAL_URL
 // En Render, RENDER_EXTERNAL_URL trae la URL pública; así no hace falta configurarla a mano.
-const publicUrl = process.env.BETTER_AUTH_URL ?? process.env.RENDER_EXTERNAL_URL ?? 'http://localhost:3000'
+const publicUrl = clean(process.env.BETTER_AUTH_URL) || clean(process.env.RENDER_EXTERNAL_URL) || 'http://localhost:3000'
 const origins = [
-  ...(process.env.TRUSTED_ORIGINS ?? 'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000').split(','),
+  ...(process.env.TRUSTED_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000').split(','),
   publicUrl,
-].map((s) => s.trim()).filter(Boolean)
+  clean(process.env.RENDER_EXTERNAL_URL),
+  ...(onRender ? ['https://*.onrender.com'] : []),
+]
+  .map(clean)
+  .filter(Boolean)
+console.log('✦ Orígenes de confianza:', [...new Set(origins)].join(', '))
 
 export const auth = betterAuth({
   baseURL: publicUrl,
   secret: process.env.BETTER_AUTH_SECRET ?? 'dev-only-secret-change-me-dev-only-secret-change-me',
-  trustedOrigins: origins,
+  trustedOrigins: [...new Set(origins)],
   database: drizzleAdapter(db, { provider: 'pg', schema }),
   emailAndPassword: { enabled: true, minPasswordLength: 8, autoSignIn: true },
   plugins: [admin({ ac, roles, defaultRole: 'user', adminRoles: ['admin'] })],
