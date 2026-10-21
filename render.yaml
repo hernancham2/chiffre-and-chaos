@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: chiffre-and-chaos
+    runtime: docker
+    plan: free
+    region: ohio
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: TRUSTED_ORIGINS
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
