@@ -1,0 +1,67 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;900&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Cinzel", "Times New Roman", serif;
+  --font-sans: "Crimson Pro", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-ink-950: #08060c;
+  --color-ink-900: #0d0a12;
+  --color-ink-800: #15111d;
+  --color-ink-700: #1f1a2b;
+  --color-ink-600: #2b2439;
+  --color-ink-500: #3c3350;
+  --color-parch: #ebdfc4;
+  --color-parch-dim: #b9ad92;
+  --color-gold: #d4a73a;
+  --color-gold-soft: #f0d58a;
+  --color-celestial: #8ec9ff;
+  --color-infernal: #e5485f;
+  --color-chaos: #a98bff;
+  --color-neutral-arc: #c9b27c;
+  --color-ok: #6fd08c;
+
+  --animate-float: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(-6px) }
+}
+
+:root { color-scheme: dark; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(1200px 700px at 70% -10%, #2a1d3d 0%, transparent 60%),
+              radial-gradient(900px 600px at -10% 110%, #3a1420 0%, transparent 55%),
+              var(--color-ink-900);
+  color: var(--color-parch);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  -webkit-font-smoothing: antialiased;
+}
+@layer base {
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0.04em; }
+}
+::selection { background: rgba(212, 167, 58, .35); }
+* { scrollbar-width: thin; scrollbar-color: var(--color-ink-500) transparent; }
+
+.panel {
+  background: linear-gradient(180deg, rgba(31, 26, 43, .86), rgba(21, 17, 29, .9));
+  border: 1px solid rgba(212, 167, 58, .22);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.gold-text {
+  background: linear-gradient(180deg, #fff2c2, #d4a73a 55%, #8d6a1c);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.rune-border { position: relative; }
+.rune-border::before {
+  content: ""; position: absolute; inset: 3px; border-radius: inherit; pointer-events: none;
+  border: 1px solid rgba(212,167,58,.14);
+}
+.caret-bar { caret-color: var(--color-gold); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

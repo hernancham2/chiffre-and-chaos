@@ -1,0 +1,24 @@
+{
+  "include": ["src", "server", "shared", "scripts", "vite.config.ts", "drizzle.config.ts"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "paths": {
+      "#/*": ["./src/*"],
+      "@/*": ["./src/*"],
+      "@shared/*": ["./shared/*"]
+    },
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "bun"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "chiffre-and-chaos",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"bun run dev:server\" \"bun run dev:web\"",
+    "dev:web": "vite --port 3000",
+    "dev:server": "bun --watch server/index.ts",
+    "build": "vite build",
+    "start": "NODE_ENV=production bun server/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "typecheck": "tsc --noEmit",
+    "test:sim": "bun scripts/simulate.ts"
+  },
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "@hono/zod-validator": "^0.9.1",
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-query": "^5.104.5",
+    "@tanstack/react-router": "1.170.45",
+    "better-auth": "^1.7.12",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.4",
+    "gsap": "^3.15.0",
+    "hono": "^4.13.13",
+    "lucide-react": "^1.60.0",
+    "radix-ui": "^1.8.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.1.18",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
+    "@tanstack/router-plugin": "^1.168.47",
+    "@types/bun": "^1.4.3",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^10.0.6",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0"
+  }
+}
