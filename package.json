@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
+    "@hono/bun": "^1.0.1",
     "@hono/zod-validator": "^0.9.1",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.104.5",

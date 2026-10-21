@@ -1,7 +1,7 @@
 import { zValidator } from '@hono/zod-validator'
 import { and, desc, eq, like, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { createBunWebSocket, serveStatic } from 'hono/bun'
+import { serveStatic, upgradeWebSocket, websocket } from '@hono/bun'
 import { logger } from 'hono/logger'
 import { z } from 'zod'
 import { questionInputSchema, settingsSchema, type ClientMsg } from '../shared/types'
@@ -17,7 +17,6 @@ if (seeded) console.log(`✦ ${seeded} preguntas sembradas`)
 
 type Env = { Variables: { user: SessionUser } }
 const app = new Hono<Env>()
-const { upgradeWebSocket, websocket } = createBunWebSocket()
 
 if (process.env.NODE_ENV !== 'production') app.use('/api/*', logger())
 
